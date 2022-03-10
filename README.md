@@ -1,9 +1,9 @@
 # BioMMe
 
 BioMME is an application that is meant to streamline building biological computational models. It is an all-in-one tool that allows the user to build a model, solve for its mathematical equations, and plot all relevant features. This is an achived version of the app with full functionality (newest version is being created and optimized for licensing at the Medical College of Wisconsin). There is a pdf tutorial that can be downloaded from this page to get the user started. 
+The application can be accessed online at  https://jwomack7512.shinyapps.io/Model_Builder/. 
 
-
-# Launch shinyCircos directly from R 
+## Launch BioMMe directly from R 
 **Step 1: Install R and RStudio**
 
 Before running the app you will need to have R and RStudio installed (tested with R 4.1.1 and RStudio 1.4.1717).  
