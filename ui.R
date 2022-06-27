@@ -6,41 +6,41 @@
 #  MCW, Milwaukee, WI, USA
 #-------------------------------------------------------------------------
 
-load.lib<-c("shinydashboard", "bs4Dash", "shiny","ggplot2","gridExtra","shinythemes",
-            "shinyWidgets","shinyjs","DT","tidyverse","dplyr","rhandsontable","data.table","ggpmisc",
-            "colourpicker","shinyBS","shinyjqui", "bsplus", "plotly", "deSolve", "waiter", "ggpubr",
-            "viridis", "Deriv", "shinycssloaders")
+# load.lib<-c("shinydashboard", "bs4Dash", "shiny","ggplot2","gridExtra","shinythemes",
+#             "shinyWidgets","shinyjs","DT","tidyverse","dplyr","rhandsontable","data.table","ggpmisc",
+#             "colourpicker","shinyBS","shinyjqui", "bsplus", "plotly", "deSolve", "waiter", "ggpubr",
+#             "viridis", "Deriv", "shinycssloaders")
+# 
+# 
+# install.lib<-load.lib[!load.lib %in% installed.packages()]
+# for(lib in install.lib) install.packages(lib,dependencies=TRUE)
+# sapply(load.lib,require,character=TRUE)
 
-
-install.lib<-load.lib[!load.lib %in% installed.packages()]
-for(lib in install.lib) install.packages(lib,dependencies=TRUE)
-sapply(load.lib,require,character=TRUE)
-
-# library(shinydashboard)
-# library(bs4Dash)
-# library(shiny)
-# library(ggplot2)
-# library(gridExtra)
-# library(shinythemes)
-# library(shinyWidgets)
-# library(shinyjs)
-# library(DT)
-# library(tidyverse)
-# library(dplyr)
-# library(rhandsontable)
-# library(data.table)
-# library(ggpmisc)
-# library(colourpicker)
-# library(shinyBS)
-# library(shinyjqui)
-# library(bsplus)
-# library(deSolve)
-# library(plotly)
-# library(Deriv)
-# library(viridis)
-# library(ggpubr)
-# library(shinycssloaders)
-# library(waiter)
+library(shinydashboard)
+library(bs4Dash)
+library(shiny)
+library(ggplot2)
+library(gridExtra)
+library(shinythemes)
+library(shinyWidgets)
+library(shinyjs)
+library(DT)
+library(tidyverse)
+library(dplyr)
+library(rhandsontable)
+library(data.table)
+library(ggpmisc)
+library(colourpicker)
+library(shinyBS)
+library(shinyjqui)
+library(bsplus)
+library(deSolve)
+library(plotly)
+library(Deriv)
+library(viridis)
+library(ggpubr)
+library(shinycssloaders)
+library(waiter)
 
 
 #load files with UI outputs
