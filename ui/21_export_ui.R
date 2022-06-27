@@ -8,7 +8,52 @@
 
 TAB_export <- 
   tabItem(tabName = "TAB_export",
-                   h2("Export")
+          bsModal(
+            id = "latex_popup",
+            title = NULL,
+            trigger = "latex_make_document",
+            #size = "small",
+            fluidRow(
+              column(
+                width = 6,
+                awesomeCheckboxGroup(
+                  inputId = "latex_pages_to_add",
+                  label = "Pages To Add",
+                  choices = c("Variable",
+                              "Equations",
+                              "Additional Equations",
+                              #"Input/Output",
+                              "Parameter Table",
+                              "Differential Eqns"),
+                  selected = c("Variable",
+                               "Equations",
+                               "Additional Equations",
+                               #"Input/Output",
+                               "Parameter Table",
+                               "Differential Eqns")
+                )
+              ),
+              column(
+                width = 6,
+                awesomeCheckboxGroup(
+                  inputId = "latex_additional_options",
+                  label = "Additional Addons",
+                  choices = c(#"Show Equation Types" = "show_eqn_type",
+                              "Show Equation Descriptions" = "show_eqn_description")
+                )
+              )
+            ),
+            hr(),
+            fluidRow(
+              column(
+                width = 12,
+                align = "right",
+                downloadButton(outputId = "export_latex_document"
+                               ,label = "Get Document")
+              )
+            )
+          ),
+          tags$head(tags$style("#latex_popup .modal-footer{ display:none}"))
                    ,fluidRow(
                      column(
                        width = 4
@@ -28,14 +73,10 @@ TAB_export <-
                                       ,placeholder = "File Name (no extension)")
                            )
                          )
-                         ,downloadBttn(outputId = "export_data_to_matlab_script"
-                                       ,label = "MatLab Code"
-                                       ,style = "unite"
-                                       ,color = "success")
-                         ,downloadBttn(outputId = "export_data_to_R_script"
-                                      ,label = "R Code"
-                                      ,style = "unite"
-                                      ,color = "success")
+                         ,downloadButton(outputId = "export_data_to_matlab_script"
+                                       ,label = "MatLab Code" )
+                         ,downloadButton(outputId = "export_data_to_R_script"
+                                      ,label = "R Code")
                        )
                      )
                      ,column(
@@ -56,10 +97,8 @@ TAB_export <-
                                        ,placeholder = "File Name (no extension)")
                            )
                          )
-                         ,downloadBttn(outputId = "export_save_data"
-                                       ,label = "Save Model"
-                                       ,style = "unite"
-                                       ,color = "success")
+                         ,downloadButton(outputId = "export_save_data"
+                                       ,label = "Save Model")
                        )
                      )
                      ,column(
@@ -80,61 +119,68 @@ TAB_export <-
                                        ,placeholder = "File Name (no extension)")
                            )
                          )
-                         ,downloadBttn(outputId = "export_latex_document"
-                                      ,label = "Latex Document"
-                                      ,style = "unite"
-                                      ,color = "success")
-                         ,dropdownMenu = boxDropdown(
-                           "Pages to Add"
-                           ,checkboxInput("latex_add_variables"
-                                          ,"Variables"
-                                          ,TRUE)
-                           ,checkboxInput("latex_add_equations"
-                                          ,"Equations"
-                                          ,TRUE)
-                           ,checkboxInput("latex_add_additionalEqns"
-                                          ,"Additional Equations"
-                                          ,TRUE)
-                           ,checkboxInput("latex_add_IO"
-                                          ,"Input/Output"
-                                          ,TRUE)
-                           ,checkboxInput("latex_add_paramTable"
-                                          ,"Parameter Table"
-                                          ,TRUE)
-                           ,checkboxInput("latex_add_diffEqns"
-                                          ,"Differential Eqns"
-                                          ,TRUE)
+                         ,actionButton(
+                           inputId = "latex_make_document",
+                           label = "Latex Download",
+                           icon = icon("download")
                          )
-                         ,sidebar = boxSidebar(
-                           id = "latexSideBar"
-                           #,width = 25
-                           ,checkboxInput(inputId = "latex_equation_headers"
-                                          ,label = "Equation Types Shown"
-                                          ,value = FALSE)
-                           ,checkboxInput(inputId = "latex_equation_description"
-                                          ,label = "Equation Descriptions Shown"
-                                          ,value = TRUE)
-                           ,checkboxInput(inputId = "latex_option_test"
-                                          ,label = "Advanced Options"
-                                          ,value = FALSE)
-                         )
+                         # ,downloadButton(outputId = "export_latex_document"
+                         #              ,label = "Latex Document")
+                         # ,dropdownMenu = boxDropdown(
+                         #   "Pages to Add"
+                         #   # awesomeCheckboxGroup(
+                         #   #   inputId = "latex_pages_to_add",
+                         #   #   label = "Pages To Add",
+                         #   #   choices = c("Variable",
+                         #   #               "Equations",
+                         #   #               "Additional Equations",
+                         #   #               "Input/Output",
+                         #   #               "Parameter Table",
+                         #   #               "Differential Eqns"),
+                         #   #   selected = "all"
+                         #   # )
+                         #   ,checkboxInput("latex_add_variables"
+                         #                  ,"Variables"
+                         #                  ,TRUE)
+                         #   ,checkboxInput("latex_add_equations"
+                         #                  ,"Equations"
+                         #                  ,TRUE)
+                         #   ,checkboxInput("latex_add_additionalEqns"
+                         #                  ,"Additional Equations"
+                         #                  ,TRUE)
+                         #   ,checkboxInput("latex_add_IO"
+                         #                  ,"Input/Output"
+                         #                  ,TRUE)
+                         #   ,checkboxInput("latex_add_paramTable"
+                         #                  ,"Parameter Table"
+                         #                  ,TRUE)
+                         #   ,checkboxInput("latex_add_diffEqns"
+                         #                  ,"Differential Eqns"
+                         #                  ,TRUE)
+                         # )
+                         # ,sidebar = boxSidebar(
+                         #   id = "latexSideBar"
+                         #   #,width = 25
+                         #   # ,checkboxInput(inputId = "latex_equation_headers"
+                         #   #                ,label = "Equation Types Shown"
+                         #   #                ,value = FALSE)
+                         #   # ,checkboxInput(inputId = "latex_equation_description"
+                         #   #                ,label = "Equation Descriptions Shown"
+                         #   #                ,value = TRUE)
+                         #   # ,checkboxInput(inputId = "latex_option_test"
+                         #   #                ,label = "Advanced Options"
+                         #   #                ,value = FALSE)
+                         # )
                        )
                      )
                     )
                    ,hr()
-                   ,box(title = NULL
-                            ,solidHeader = FALSE
-                            #,background="#000"
-                            ,collapsible = FALSE
-                            ,closable = FALSE
-                            ,width = 12
-                            ,tabBox(width = 12
-                                    ,tabPanel("Parameters"
-                                              ,DTOutput("table_parameters_export"))
-                                    ,tabPanel("Equations"
-                                              ,DTOutput("table_equations_export"))
-                                    ,tabPanel("Initial Conditions"
-                                              ,DTOutput("table_ICs_export"))
-                                    ) #end tabbox
-                            )#end box
+                   ,tabBox(width = 12
+                          ,tabPanel("Parameters"
+                                    ,DTOutput("table_parameters_export"))
+                          ,tabPanel("Equations"
+                                    ,DTOutput("table_equations_export"))
+                          ,tabPanel("Initial Conditions"
+                                    ,DTOutput("table_ICs_export"))
+                            ) #end tabbox
                    )#end tabitem

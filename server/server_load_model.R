@@ -15,10 +15,19 @@ checkForLoadedValue <- function(loadedValue, initValue) {
 }
 ################################ Load Server #################################
 
+
+w_load <- Waiter$new(
+  html =  spin_pong(),
+  color = transparent(0.9)
+)
+
 #when load model button is pressed, the .rds file is loaded in and its components are broken apart and added to the model
 #some of these loads for reactive variables use a "is.null" check to make sure they exist.  These variables were added
 # after specific models were made and this adds functionality to those models that would otherwise have issues.
 observeEvent(input$load_model, {
+  #w_load$show()
+  waiter_show(html = waiting_screen)
+  Sys.sleep(1)
   model.load <- readRDS(input$load_model$datapath)
   
   #-----------------------------------------------------------------------------
@@ -42,19 +51,28 @@ observeEvent(input$load_model, {
   # Load Equations Section
   
   #-----------------------------------------------------------------------------
-  eqns$main <- model.load$main
+  eqns$main           <- model.load$main
+  eqns$eqn.main.latex <- model.load$eqn.main.latex
   if (!is.null(model.load$eqn.descriptions)) {
     eqns$eqn.descriptions <- model.load$eqn.descriptions
   } else {
     eqns$eqn.descriptions <- rep("", each = model.load$n.eqns)
   }
-  eqns$n.eqns <- length(model.load$main) #number of equations in model (not including rates)
-  
-  eqns$rate.eqns <- model.load$rate.eqns #load rate equations
-  eqns$time.dep.eqns = model.load$time.dep.eqns #load all time dependent eqns
-  eqns$additional.eqns = model.load$additional.eqns #load all additional eqns -time, rate, etc...
-  eqns$first.run <- model.load$first.run
-  eqns$eqn.info <- model.load$eqn.info
+  eqns$n.eqns.no.del   <- checkForLoadedValue(model.load$n.eqns.no.del, 0)
+  eqns$n.eqns          <- length(model.load$main) #number of equations in model (not including rates)
+  eqns$n.eqns.chem     <- checkForLoadedValue(model.load$n.eqns.chem, 0)
+  eqns$n.eqns.enz      <- checkForLoadedValue(model.load$n.eqns.enz, 0)
+  eqns$n.eqns.syn      <- checkForLoadedValue(model.load$n.eqns.syn, 0)
+  eqns$n.eqns.deg      <- checkForLoadedValue(model.load$n.eqns.deg, 0)
+  eqns$rate.eqns       <- model.load$rate.eqns #load rate equations
+  eqns$time.dep.eqns   <- model.load$time.dep.eqns #load all time dependent eqns
+  eqns$additional.eqns <- model.load$additional.eqns #load all additional eqns -time, rate, etc...
+  eqns$first.run       <- model.load$first.run
+  eqns$eqn.info        <- model.load$eqn.info
+  eqns$eqn.chem        <- model.load$eqn.chem
+  eqns$eqn.enzyme      <- model.load$eqn.enzyme
+  eqns$eqn.syn         <- model.load$eqn.syn
+  eqns$eqn.deg         <- model.load$eqn.deg
   
   #-----------------------------------------------------------------------------
   
@@ -66,13 +84,14 @@ observeEvent(input$load_model, {
   params$vals.all <- model.load$vals.all
   params$comments.all <- model.load$comments.all
 
-  if (!is.null(model.load$param.table)) {
-    params$param.table <- model.load$param.table
-  } else {
-    params$param.table <- data.frame(params$vars.all, params$vals.all, params$comments.all)
-    colnames(params$param.table) <- c("Parameter", "Value", "Description")
-  }
-
+  # if (!is.null(model.load$param.table)) {
+  #   params$param.table <- model.load$param.table
+  # } else {
+  #   params$param.table <- data.frame(params$vars.all, params$vals.all, params$comments.all)
+  #   colnames(params$param.table) <- c("Parameter", "Value", "Description")
+  # }
+  params$param.table <- data.frame(params$vars.all, params$vals.all, params$comments.all)
+  colnames(params$param.table) <- c("Parameter", "Value", "Description")
   #load parameters from equations
   params$eqns.vars = model.load$eqns.vars
   params$eqns.vals = model.load$eqns.vals
@@ -124,9 +143,12 @@ observeEvent(input$load_model, {
   # Load Differential Equations Section
   
   #-----------------------------------------------------------------------------
-  DE$eqns <- checkForLoadedValue(model.load$eqns, vector()) 
-  DE$eqn.in.latex <- checkForLoadedValue(model.load$eqn.in.latex, vector())
-  
+  DE$eqns              <- checkForLoadedValue(model.load$eqns, vector()) 
+  DE$eqn.in.latex      <- checkForLoadedValue(model.load$eqn.in.latex, vector())
+  DE$custom.diffeq.var <- model.load$custom.diffeq.var
+  DE$custom.diffeq     <- model.load$custom.diffeq
+  DE$custom.diffeq.df  <- model.load$custom.diffeq.df
+  jPrint("Loaded DE")
   #-----------------------------------------------------------------------------
   
   # Load Input/Outputs Section
@@ -140,8 +162,8 @@ observeEvent(input$load_model, {
   IO$n.outputs = checkForLoadedValue(model.load$n.outputs, 0)
   IO$bool.input.exists = checkForLoadedValue(model.load$bool.input.exists, TRUE)
   IO$bool.output.exists = checkForLoadedValue(model.load$bool.output.exists, TRUE)
-  IO$bool.output.exists = checkForLoadedValue(model.load$bool.output.exists, FALSE)
-  IO$bool.output.exists = checkForLoadedValue(model.load$bool.output.exists, FALSE)
+  IO$bool.input.added = checkForLoadedValue(model.load$bool.input.added, FALSE)
+  IO$bool.output.added = checkForLoadedValue(model.load$bool.output.added, FALSE)
   IO$input.info = checkForLoadedValue(model.load$input.info, data.frame(matrix(ncol = 7, nrow = 0,
                                                                                dimnames = list(NULL, c("Type", 
                                                                                                        "Species", 
@@ -159,28 +181,13 @@ observeEvent(input$load_model, {
                                                                                                        "Kcat", 
                                                                                                        "Enzyme")))))
   
-  # if (!is.null(model.load$n.inputs)) {IO$n.inputs = model.load$n.inputs} else {IO$n.inputs = 0}
-  # if (!is.null(model.load$n.outputs)) {IO$n.outputs = model.load$n.outputs} else {IO$n.outputs = 0}
-  # if (!is.null(model.load$bool.input.exists)) {IO$bool.input.exists = model.load$bool.input.exists} else {IO$bool.input.exists = TRUE}
-  # if (!is.null(model.load$bool.output.exists)) {IO$bool.output.exists = model.load$bool.output.exists} else {IO$bool.output.exists = TRUE}
-  # if (!is.null(model.load$bool.input.added)) {IO$bool.input.added = model.load$bool.input.added} else {IO$bool.input.added = FALSE}  
-  # if (!is.null(model.load$bool.output.added)) {IO$bool.output.added = model.load$bool.output.added} else {IO$bool.output.added = FALSE}
-  # if (!is.null(model.load$input.info)) {IO$input.info = model.load$input.info} else{input.info = data.frame(matrix(ncol = 7, nrow = 0,
-  #                                                                                                          dimnames = list(NULL, c("Type", 
-  #                                                                                                                                  "Species", 
-  #                                                                                                                                  "RateConstant",
-  #                                                                                                                                  "RateBySpecies", 
-  #                                                                                                                                  "Vmax", 
-  #                                                                                                                                  "Kcat", 
-  #                                                                                                                                  "Enzyme"))))}
-  # if (!is.null(model.load$output.info)) {IO$output.info = model.load$output.info} else{output.info = data.frame(matrix(ncol = 7, nrow = 0,
-  #                                                                                                          dimnames = list(NULL, c("Type", 
-  #                                                                                                                                  "Species", 
-  #                                                                                                                                  "RateConstant",
-  #                                                                                                                                  "RateBySpecies", 
-  #                                                                                                                                  "Vmax", 
-  #                                                                                                                                  "Kcat", 
-  #                                                                                                                                  "Enzyme"))))}
+
+  #-----------------------------------------------------------------------------
+  
+  # Load Counts Section
+  
+  #-----------------------------------------------------------------------------
+  counts$loading.model <- counts$loading.model + 1
 
   
   #-----------------------------------------------------------------------------
@@ -200,33 +207,100 @@ observeEvent(input$load_model, {
   # Load Results Section
   
   #-----------------------------------------------------------------------------
-  results$model <- model.load$model
-  results$is.pp <- model.load$is.pp
-  results$pp.eqns <- model.load$pp.eqns
+  results$model       <- model.load$model
+  results$is.pp       <- model.load$is.pp
+  results$pp.eqns     <- model.load$pp.eqns
   results$pp.eqns.col <- model.load$pp.eqns.col
-  results$pp.vars <- model.load$pp.vars
-  results$pp.model <- model.load$pp.model
-
+  results$pp.vars     <- model.load$pp.vars
+  results$pp.model    <- model.load$pp.model
+  results$model.final <- checkForLoadedValue(model.load$model.final, data.frame())
+  results$model.has.been.solved <- checkForLoadedValue(model.load$model.has.been.solved,
+                                                       FALSE)
   #-----------------------------------------------------------------------------
   
   # Load Logs Section
   
   #-----------------------------------------------------------------------------
-  logs$IO.logs <- checkForLoadedValue(model.load$IO.logs, vector())
-  logs$input.logs <- checkForLoadedValue(model.load$input.logs, vector())
+  logs$IO.logs     <- checkForLoadedValue(model.load$IO.logs, vector())
+  logs$input.logs  <- checkForLoadedValue(model.load$input.logs, vector())
   logs$output.logs <- checkForLoadedValue(model.load$output.logs, vector())
+  
+  
+  #-----------------------------------------------------------------------------
+  
+  # ID for variable Section
+  
+  #-----------------------------------------------------------------------------
+  id$id.variables <- checkForLoadedValue(model.load$id.variables, data.frame(matrix(ncol = 2
+                                                                                    ,nrow = 0,
+                                                                                    dimnames = list(NULL, c("id", "idName")))))
+  id$id.parameters <- checkForLoadedValue(model.load$id.parameters, data.frame(matrix(ncol = 2
+                                                                                      ,nrow = 0,
+                                                                                      dimnames = list(NULL, c("id", "idName")))))
+  id$id.equations <- checkForLoadedValue(model.load$id.equations, data.frame(matrix(ncol = 2
+                                                                                    ,nrow = 0,
+                                                                                    dimnames = list(NULL, c("id", "idName")))))
+  id$id.diffeq <- checkForLoadedValue(model.load$id.diffeq, data.frame(matrix(ncol = 2
+                                                                              ,nrow = 0,
+                                                                              dimnames = list(NULL, c("id", "idName")))))
+  
+  id$id.var.seed    <- checkForLoadedValue(model.load$id.var.seed, 1)
+  id$id.eqn.seed    <- checkForLoadedValue(model.load$id.eqn.seed, 1)
+  id$id.param.seed  <- checkForLoadedValue(model.load$id.param.seed, 1)
+  id$id.diffeq.seed <- checkForLoadedValue(model.load$id.diffeq.seed, 1)
+  
+  #Generates seeds for an older model that does not use the id system yet
+  # if (id$id.var.seed == 1) {
+  #   #generate ids
+  #   ids <- GenerateIdsForOldModel(vars$species, params$vars.all, eqns$main, DE$eqns)
+  #   id$id.variables <- ids$var
+  #   id$id.parameters <- ids$par
+  #   id$id.equations <- ids$eqn
+  #   id$id.diffeq <- ids$dif
+  #   id$id.seed <- ids$seed
+  # }
+  jPrint("Loaded Ids")
+  #solveForDiffEqs()
+  
+  # Load things for loop mode
+  loop$parameters <- params$param.table
+  loop$ICs <- ICs$ICs.table
+  loop$model.results <- results$model.final
+  loop$time.start <- options$time.start 
+  loop$time.end <- options$time.end 
+  loop$time.step <- options$time.step 
+  jPrint("Loaded Loop")
+  
+  #initialize things for compare mode
+  compareModel$model.1 <- results$model.final
+  compareModel$model.2 <- results$model.final
+  compareModel$model.3 <- results$model.final
+  compareModel$model.4 <- results$model.final
   
   #-----------------------------------------------------------------------------
   
   # Update all UI that need values from load
   
   #-----------------------------------------------------------------------------
+  # The next two reset the parameter table
+  updatePickerInput(
+    session = session,
+    inputId = "parameters_filter_type",
+    selected = "Eqns"
+  )
+  updatePickerInput(
+    session = session,
+    inputId = "parameters_filter_type",
+    selected = "All"
+  )
+  
+  parameter_table_values$table <- params$param.table
   my.choices <- paste0(seq(eqns$n.eqns), ") ", eqns$main)
   
   # updatePickerInput(session, 
   #                   "compare_models_select_vars",
   #                   choices = params$vars.all)
-  
+  jPrint("update 1")
   updatePickerInput(session,
                     "eqnCreate_selectEqnForDescription",
                     choices = my.choices)
@@ -246,6 +320,7 @@ observeEvent(input$load_model, {
   updatePickerInput(session
                     ,"Inout_delete_IO_eqn"
                     ,choices = seq(IO$n.IO))
+  jPrint("update 2")
   
   updatePickerInput(session,
                     'eqnCreate_edit_select_equation'
@@ -262,6 +337,7 @@ observeEvent(input$load_model, {
   updatePickerInput(session #updates output substrate choices for enzyme degradation
                     ,"enzyme_deg_substrate"
                     ,choices = sort(vars$species))
+  jPrint("update 3")
   
   # Update Model Options -------------------------------------------------------
   updateTextInput(session,
@@ -283,352 +359,21 @@ observeEvent(input$load_model, {
                     "execute_ode_solver_type",
                     selected = options$ode.solver.type)
 
-  
-  #------------------------------------------------
-  #Parameters Rendered from Equations
-  #------------------------------------------------
-  output$parameters_eqns_header <- renderUI({
-    h4("Parameters From Equations")
-  })
-  
-  output$parameters_eqns <- renderUI({
-    number_parameters = length(params$eqns.vars)
-    
-    fluidRow(column(width=2
-                    ,lapply(seq(number_parameters), function(i){
-                      textInput(inputId=paste0("parameter_", as.character(i))
-                                ,label=params$eqns.vars[i]
-                                ,value = ifelse(params$first.param.eqn.stored, params$eqns.vals[i], "0"))
-                    }))
-             ,column(width=8
-                     ,lapply(seq(number_parameters), function(i){
-                       textInput(inputId=paste0("parameter_description_", as.character(i))
-                                 ,label="Parameter Description"
-                                 ,value =ifelse(params$first.param.eqn.stored, params$eqns.comments[i], ""))
-                     }))
-    ) #end fluidRow
-  })
-  
-  #------------------------------------------------
-  #Parameters Rendered from Input values
-  #------------------------------------------------
-  if(length(params$inputs.vars)>0){
-    output$parameters_inputs_header <- renderUI({
-      h4("Parameters From Inputs")
-    })
-    
-    output$parameters_inputs <- renderUI({
-      number_parameters = length(params$inputs.vars) #find number of parameters in inputs
-      observe({print(paste("Lenght out:", number_parameters))
-        print(paste("parame value:", params$param.input[1]))
-      })
-      #generate labels with paramters name to put value into
-      #generate text input next to it to put comment for variable into
-      #ifelse in value is used to put the current value into the text input if it exists otherwise a 0 or ""
-      fluidRow(column(width=2
-                      ,lapply(seq(number_parameters), function(i){
-                        textInput(inputId=paste0("parameter_input_", as.character(i))
-                                  ,label=params$inputs.vars[i]
-                                  ,value = ifelse(params$first.inputs.stored, params$inputs.vals[i], "0"))
-                      }))
-               ,column(width=8
-                       ,lapply(seq(number_parameters), function(i){
-                         textInput(inputId=paste0("parameter_description_input_", as.character(i))
-                                   ,label="Parameter Description"
-                                   ,value =ifelse(params$first.inputs.stored, params$inputs.comments[i], ""))
-                       }))
-      ) #end fluidRow
-    })
+  if (ncol(results$model.final) != 0) {
+    updatePickerInput(session
+                      ,"lineplot_xvar"
+                      ,choices = colnames(results$model.final[1]))
   }
   
-  #------------------------------------------------
-  #Parameters Rendered from Output values
-  #------------------------------------------------
-  if(length(params$outputs.vars)>0){
-    output$parameters_outputs_header <- renderUI({
-      h4("Parameters From Output")
-    })
-    
-    output$parameters_outputs <- renderUI({
-      number_parameters = length(params$outputs.vars) #find number of parameters in inputs
-      observe({print(paste("Lenght out:", number_parameters))
-        print(paste("parame value:", params$param.output[1]))
-      })
-      
-      #generate labels with paramters name to put value into
-      #generate text input next to it to put comment for variable into
-      #ifelse in value is used to put the current value into the text input if it exists otherwise a 0 or ""
-      fluidRow(column(width=2
-                      ,lapply(seq(number_parameters), function(i){
-                        textInput(inputId=paste0("parameter_output_", as.character(i))
-                                  ,label=params$outputs.vars[i]
-                                  ,value = ifelse(params$first.outputs.stored, params$outputs.vals[i], "0"))
-                      }))
-               ,column(width=8
-                       ,lapply(seq(number_parameters), function(i){
-                         textInput(inputId=paste0("parameter_description_output_", as.character(i))
-                                   ,label="Parameter Description"
-                                   ,value =ifelse(params$first.outputs.stored, params$outputs.comments[i], ""))
-                       }))
-      ) #end fluidRow
-    })
-  }
+  updateSelectizeInput(session,
+                       "lineplot_yvar"
+                       ,choices  = colnames(results$model.final)[2:ncol(results$model.final)]
+                       ,selected = colnames(results$model.final)[2:ncol(results$model.final)])
+  updateTextInput(session, "loop_start_time", value = input$execute_time_start)
+  updateTextInput(session, "loop_end_time", value = input$execute_time_end)
+  updateTextInput(session, "loop_time_step", value = input$execute_time_step)
+  jPrint("update 5")
   
-  #------------------------------------------------
-  #Parameters Rendered from rateEqn values
-  #------------------------------------------------
-  if(length(params$rate.eqn.vars)>0){
-    output$parameters_rateEqns_header <- renderUI({
-      h4("Parameters From Rate Equation")
-    })
-    
-    output$parameters_rateEqns <- renderUI({
-      number_parameters = length(params$rate.eqn.vars) #find number of parameters in inputs
-      observe({print(paste("Lenght out:", number_parameters))
-        print(paste("parame value:", params$rate.eqn.vars[1]))
-      })
-      
-      #generate labels with paramters name to put value into
-      #generate text input next to it to put comment for variable into
-      #ifelse in value is used to put the current value into the text input if it exists otherwise a 0 or ""
-      fluidRow(column(width=2
-                      ,lapply(seq(number_parameters), function(i){
-                        textInput(inputId=paste0("parameter_rateEqn_", as.character(i))
-                                  ,label=params$rate.eqn.vars[i]
-                                  ,value = ifelse(params$first.rate.eqn.stored, params$rate.eqn.vals[i], "0"))
-                      }))
-               ,column(width=8
-                       ,lapply(seq(number_parameters), function(i){
-                         textInput(inputId=paste0("parameter_description_rateEqn_", as.character(i))
-                                   ,label="Parameter Description"
-                                   ,value =ifelse(params$first.rate.eqn.stored, params$rate.eqn.comments[i], ""))
-                       }))
-      ) #end fluidRow
-    })
-  }
-  
-  #------------------------------------------------
-  #Parameters Rendered from TimeDependent values
-  #------------------------------------------------
-  if(length(params$time.dep.vars)>0)
-  {
-    output$parameters_TD_eqns_header <- renderUI({
-      h4("Parameters From Time Dependent Equations")
-    })
-    
-    output$parameters_TD_eqns <- renderUI({
-      number_parameters = length(params$time.dep.vars) #find number of parameters in inputs
-      
-      #generate labels with paramters name to put value into
-      #generate text input next to it to put comment for variable into
-      #ifelse in value is used to put the current value into the text input if it exists otherwise a 0 or ""
-      fluidRow(column(width = 2
-                      ,lapply(seq(number_parameters), function(i){
-                        textInput(inputId = paste0("parameter_TD_", as.character(i))
-                                  ,label = params$time.dep.vars[i]
-                                  ,value = ifelse(params$first.time.dep.stored, params$time.dep.vars_values[i], "0"))
-                      }))
-               ,column(width = 8
-                       ,lapply(seq(number_parameters), function(i){
-                         textInput(inputId = paste0("parameter_description_TD_", as.character(i))
-                                   ,label = "Parameter Description"
-                                   ,value = ifelse(params$first.time.dep.stored, params$time.dep.vars_comments[i], ""))
-                       }))
-      ) #end fluidRow
-    })
-  }
-  
-  
-  #------------------------------------------------
-  # ICs rendered from stored data
-  #------------------------------------------------
-  output$ICs_UI <- renderUI({
-    number_var = length(vars$species)
-    
-    fluidRow(column(width=4
-                    ,lapply(seq(number_var), function(i){
-                      textInput(inputId=paste0("IC_", as.character(i))
-                                ,label=paste(vars$species[i], "initial value:")
-                                ,value = ICs$vals[i])
-                    }))
-             # ,column(width=1
-             #         ,lapply(seq(number_parameters), function(i){
-             #           checkboxInput(inputId=paste0("parameter_check_unknown_", as.character(i))
-             #                     ,label="Value Unknown"
-             #                     ,value = FALSE)
-             #         }))
-             ,column(width=6
-                     ,lapply(seq(number_var), function(i){
-                       textInput(inputId=paste0("ICs_description_", as.character(i))
-                                 ,label="Comment"
-                                 ,value = ICs$comments[i])
-                     })
-             )
-    ) #end fluidRown
-  })
-  
-  #------------------------------------------------
-  # ICs rendered from stored data
-  #------------------------------------------------
-  # output$ICs_UI <- renderUI({
-  #   number_var = length(vars$species)
-  #   
-  #   fluidRow(column(width=2
-  #                   ,lapply(seq(number_var), function(i){
-  #                     textInput(inputId=paste0("IC_", as.character(i))
-  #                               ,label=paste(vars$species[i], "initial value:")
-  #                               ,value = ICs$vals[i])
-  #                   }))
-  #            # ,column(width=1
-  #            #         ,lapply(seq(number_parameters), function(i){
-  #            #           checkboxInput(inputId=paste0("parameter_check_unknown_", as.character(i))
-  #            #                     ,label="Value Unknown"
-  #            #                     ,value = FALSE)
-  #            #         }))
-  #            ,column(width=8
-  #                    ,lapply(seq(number_var), function(i){
-  #                      textInput(inputId=paste0("ICs_description_", as.character(i))
-  #                                ,label="Comment"
-  #                                ,value = ICs$comments[i])
-  #                    })
-  #            )
-  #   ) #end fluidRown
-  # })
-  
-  #------------------------ L O O P  M O D E L --------------------------------#
-  
-################################################################################
-
-#Load initial Conditions in
-
-################################################################################
-  #------------------------------------------------
-  #Parameters Rendered from Equations
-  #------------------------------------------------
-  output$loop_parameters_eqns_header <- renderUI({
-    #req(input$eqnCreate_addEqnToVector)
-    h4("Parameters From Equations")
-  })
-  
-  output$loop_parameters_eqns <- renderUI({
-    #req(input$eqnCreate_addEqnToVector)
-    number_parameters = length(params$eqns.vars)
-    
-    fluidRow(column(width=2
-                    ,lapply(seq(number_parameters), function(i){
-                      textInput(inputId=paste0("loop_parameter_", as.character(i))
-                                ,label=params$eqns.vars[i]
-                                ,value = ifelse(params$first.param.eqn.stored, params$eqns.vals[i], "0"))
-                    }))
-             ,column(width=8
-                     ,lapply(seq(number_parameters), function(i){
-                       textInput(inputId=paste0("loop_parameter_description_", as.character(i))
-                                 ,label="Parameter Description"
-                                 ,value =ifelse(params$first.param.eqn.stored, params$eqns.comments[i], ""))
-                     }))
-    ) #end fluidRow
-  })
-  
-  #------------------------------------------------
-  #Parameters Rendered from Input values
-  #------------------------------------------------
-  output$loop_parameters_inputs_header <- renderUI({
-    #req(input$Inout_addInVarToDf)
-    h4("Parameters From Inputs")
-  })
-  
-  output$loop_parameters_inputs <- renderUI({
-    req(input$Inout_addInVarToDf)
-    number_parameters = length(params$inputs.vars) #find number of parameters in inputs
-    
-    #generate labels with paramters name to put value into
-    #generate text input next to it to put comment for variable into
-    #ifelse in value is used to put the current value into the text input if it exists otherwise a 0 or ""
-    fluidRow(column(width=2
-                    ,lapply(seq(number_parameters), function(i){
-                      textInput(inputId=paste0("loop_parameter_input_", as.character(i))
-                                ,label=params$inputs.vars[i]
-                                ,value = ifelse(params$first.inputs.stored, params$inputs.vals[i], "0"))
-                    }))
-             ,column(width=8
-                     ,lapply(seq(number_parameters), function(i){
-                       textInput(inputId=paste0("loop_parameter_description_input_", as.character(i))
-                                 ,label="Parameter Description"
-                                 ,value =ifelse(params$first.inputs.stored, params$inputs.comments[i], ""))
-                     }))
-    ) #end fluidRow
-  })
-  
-  #------------------------------------------------
-  #Parameters Rendered from Output values
-  #------------------------------------------------
-  output$loop_parameters_outputs_header <- renderUI({
-    #req(input$Inout_addOutVarToDf)
-    h4("Parameters From Output")
-  })
-  
-  output$loop_parameters_outputs <- renderUI({
-    req(input$Inout_addOutVarToDf)
-    number_parameters = length(params$outputs.vars) #find number of parameters in inputs
-    
-    #generate labels with paramters name to put value into
-    #generate text input next to it to put comment for variable into
-    #ifelse in value is used to put the current value into the text input if it exists otherwise a 0 or ""
-    fluidRow(column(width = 2
-                    ,lapply(seq(number_parameters), function(i){
-                      textInput(inputId = paste0("loop_parameter_output_", as.character(i))
-                                ,label = params$outputs.vars[i]
-                                ,value = ifelse(params$first.outputs.stored, params$outputs.vals[i], "0"))
-                    }))
-             ,column(width = 8
-                     ,lapply(seq(number_parameters), function(i){
-                       textInput(inputId = paste0("loop_parameter_description_output_", as.character(i))
-                                 ,label = "Parameter Description"
-                                 ,value = ifelse(params$first.outputs.stored, params$outputs.comments[i], ""))
-                     }))
-    ) #end fluidRow
-  })
-  
-  output$loop_ICs_UI <- renderUI({
-    #req(input$Button_load_model)
-    number_var = length(vars$species)
-    
-    
-    fluidRow(column(width = 2
-                    ,lapply(seq(number_var), function(i){
-                      textInput(inputId = paste0("loop_IC_", as.character(i))
-                                ,label = paste(vars$species[i], "initial value:")
-                                ,value = ifelse(ICs$first.IC.stored, ICs$vals[i], "0"))
-                    }))
-             # ,column(width=1
-             #         ,lapply(seq(number_parameters), function(i){
-             #           checkboxInput(inputId=paste0("parameter_check_unknown_", as.character(i))
-             #                     ,label="Value Unknown"
-             #                     ,value = FALSE)
-             #         }))
-             # ,column(width=8
-             #         ,lapply(seq(number_var), function(i){
-             #           textInput(inputId=paste0("loop_ICs_description_", as.character(i))
-             #                     ,label="Comment"
-             #                     ,value = ifelse(ICs$first.IC.stored, ICs$comments[i], ""))
-             #         })
-             # )
-    ) #end fluidRown
-    
-  })
-  
+  # w_load$hide()
+  waiter_hide()
 })
-
-# rv <- reactiveValues(vars_in_model = vector() #stores model variable
-#                      ,eqns_in_model = vector() #stores eqn type in model
-#                      ,parameters_in_model = vector() #store parameter variable
-#                      ,parameter_values = vector() #store parameter value
-#                      ,IC_values = vector() #store initial condition value
-#                      ,diffEQs = vector() #store differential equations
-#                      ,number_of_equations = 0 #stores number of total equations in model (used to autofill names of some var)
-#                      ,inputOutputs_df = data.frame(matrix(ncol=6, nrow=0,
-#                                                           dimnames=list(NULL, c("In_or_Out", "Type", "Species", "VarName", "VarValue", "VarComment"))))
-#                      ,first_inOut = TRUE #determines if In/out input has been given yet.  Avoids adding to df error
-#                      ,In_out_added = FALSE
-#                      ,first_run = TRUE) #determine if first equation is added yet or not
-# 

@@ -13,8 +13,21 @@ strsplits <- function(x, splits, ...)
   return(x[!x == ""]) # Remove empty values
 }
 
-variableCheck <- function(variable, currentVarList) {
+variableCheck <- function(variable, 
+                          currentVarList, 
+                          parameterList
+                          ) {
   #function checks if variable is good to use for model
+  # Inputs: 
+  #  @variable - variable to be checked for conflicts
+  #  @currentVarList - vector of variable names
+  #  @parameterList  - vector of parameter names
+  # Outputs:
+  #  @var.pass - boolean, true if no conflicts, false if conflicts
+  #  @error.message - message describing conflict
+  #  @error.code - numeric code referring to type of conflict
+  
+
   #Checks for: 
   # 1. Repeat Var Name
   # 2. Var starting with number
@@ -27,10 +40,11 @@ variableCheck <- function(variable, currentVarList) {
   
   #Error Codes:
   # 0 - No Error
-  # 1 - Variable is already used
+  # 1 - Variable name found in variable name vector
   # 2 - Variable name starts with number
   # 3 - Variable name contains special characters
   # 4 - Variable name starts with punctuation
+  # 5 - Variable name found in parameter names
   
   var.pass <- TRUE
   error.message <- "None"
@@ -62,6 +76,17 @@ variableCheck <- function(variable, currentVarList) {
     error.message <- paste0(variable, ": starts with punctuation")
     error.code <- 4
   }
+  else if (variable %in% parameterList) {
+    var.pass <- FALSE
+    error.message <- paste0(variable, ": Variable is already used in parameters")
+    error.code <- 5
+  }
+  #check to see if variable is blank space
+  else if (grepl("^\\s*$", variable)) {
+    var.pass <- FALSE
+    error.message <- "Variable is missing..."
+    error.code <- 6
+  }
   
   out <- list(var.pass, error.message, error.code)
   return(out)
@@ -87,15 +112,18 @@ observeEvent(input$createVar_addVarToList, {
     vector.of.vars <- strsplits(input$createVar_varInput, c(",", " "))
     for (i in seq(length(vector.of.vars))) {
       var <- vector.of.vars[i]
-      check.vars <- variableCheck(var, vars$species)
+      check.vars <- variableCheck(var, vars$species, params$vars.all)
       passed.check <- check.vars[[1]]
       error.message <- check.vars[[2]]
       if (passed.check) {
         vars$species <- append(vars$species, vector.of.vars[i])
         vars$descriptions <- append(vars$descriptions, "")
-        #update table values for for infor
-        observe({print(vars$table)})
-        observe(print(var))
+        #assign id to variable
+        ids <- GenerateId(id$id.var.seed, "variable")
+        unique.id <- ids[[2]]
+        id$id.var.seed <- ids[[1]]
+        idx.to.add <- nrow(id$id.variables) + 1
+        id$id.variables[idx.to.add, ] <- c(unique.id, vector.of.vars[i])
         #add variable to variable table
         if (nrow(vars$table) == 0) {
           vars$table[1,] <- c(var, "")
@@ -114,12 +142,17 @@ observeEvent(input$createVar_addVarToList, {
           ICs$vals <- c(ICs$vals, 0)
           ICs$comments <- c(ICs$comments, paste0("Initial Concentration of ", var))
         }
-        
-        observe({print(vars$table)})
+        loop$ICs <- ICs$ICs.table
       }
       else{
-        session$sendCustomMessage(type = 'testmessage',
-                                  message = error.message)
+        # session$sendCustomMessage(type = 'testmessage',
+        #                           message = error.message)
+        sendSweetAlert(
+          session = session,
+          title = "Error...",
+          text = error.message,
+          type = "error"
+        )
       }
       
     }
@@ -166,7 +199,9 @@ observeEvent(input$createVar_deleteVarButton, {
   
   showModal(modalDialog(
     
-    title = paste0("Are you sure you want to delete variable: ", val.to.delete),
+    title = paste0("Are you sure you want to delete variable: ", 
+                   val.to.delete,
+                   "? Removing variables that are used in equations could be detremential to the program"),
     footer = tagList(actionButton("confirmDelete", "Delete"),
                      modalButton("Cancel")
     )
@@ -177,7 +212,6 @@ observeEvent(input$createVar_deleteVarButton, {
   
 })
 
-
 output$createVar_displayVars <- renderText({
   if (length(vars$species > 0)) {
     paste(vars$species, collapse = "<br>")
@@ -187,50 +221,100 @@ output$createVar_displayVars <- renderText({
   
 })
 
-################################################################################
-#Server Section that controls editable table of variables
-# needs to create table that is editable and changes the respectable RVs.
-# should control the vars: name, description, table
 
-output$myVariables_DT <- renderDT({
-  DT::datatable(vars$table
-                ,editable = list(target = "column", disable = list(columns = 0))
-                #,extensions = 'Buttons'
-                ,options = list(autoWidth = TRUE
-                                ,ordering = FALSE
-                                ,pageLength = -1
-                                ,columnDefs = list(list(width = "85%", targets = 2))
-                                ,dom = 't'
-                                ,initComplete = JS(
-                                  "function(settings, json) {",
-                                  "$(this.api().table().header()).css({'background-color': '#007bff', 'color': 'white'});",
-                                  "}")
-                                # ,buttons = list("copy"
-                                #                 ,list(extend = "csv", filename = "Variables")
-                                #                 ,list(extend = "excel", filename = "Variables")
-                                #                 ,list(extend = "pdf", filename = "Variables")
-                                #                 ,"print"
-                                #                 )
-                                )
-                )
-
+# ---Rhandsometable rendering---------------------------------------------------
+output$myVariables_DT <- renderRHandsontable({
+  colnames(vars$table) <- c("Variable Name", "Description")
+  jPrint("num col")
+  jPrint(nrow(vars$table))
+  if (nrow(vars$table) == 0) {
+    temp <- data.frame(c("<- Add Variable(s) to begin", " "))
+    temp <- transpose(temp)
+    colnames(temp) <- c("Variable Name", "Description")
+    rhandsontable(temp,
+                  rowHeaders = NULL,
+                  colHeaderWidth = 100,
+                  stretchH = "all",
+                  readOnly = TRUE
+    ) %>%
+      hot_cols(colWidth = c(90, 30),
+               manualColumnMove = FALSE,
+               manualColumnResize = TRUE,
+               halign = "htCenter",
+               valign = "htMiddle",
+               renderer = "
+           function (instance, td, row, col, prop, value, cellProperties) {
+             Handsontable.renderers.NumericRenderer.apply(this, arguments);
+             if (row % 2 == 0) {
+              td.style.background = '#f9f9f9';
+             } else {
+              td.style.background = 'white';
+             };
+           }") %>%
+      hot_rows(rowHeights = 40) %>%
+      hot_context_menu(allowRowEdit = FALSE,
+                       allowColEdit = FALSE
+      )
+  } else {
+    rhandsontable(vars$table,
+                  rowHeaders = NULL,
+                  colHeaderWidth = 100,
+                  stretchH = "all"
+    ) %>%
+      hot_cols(colWidth = c(30, 90),
+               manualColumnMove = FALSE,
+               manualColumnResize = TRUE,
+               halign = "htCenter",
+               valign = "htMiddle",
+               renderer = "
+           function (instance, td, row, col, prop, value, cellProperties) {
+             Handsontable.renderers.NumericRenderer.apply(this, arguments);
+             if (row % 2 == 0) {
+              td.style.background = '#f9f9f9';
+             } else {
+              td.style.background = 'white';
+             };
+           }") %>%
+      hot_col("Variable Name", readOnly = TRUE) %>%
+      hot_rows(rowHeights = 40) %>%
+      hot_context_menu(allowRowEdit = FALSE,
+                       allowColEdit = FALSE
+      )
+  }
+  
+  
 })
 
 
-proxy_var_table = dataTableProxy("vars_DT")
-
-observeEvent(input$myVariables_DT_cell_edit, {
-  info = input$myVariables_DT_cell_edit
-  vars$table <- editData(vars$table, info)
-  replaceData(proxy_var_table, vars$table, resetPaging = FALSE)
-
-  #Reset the parameter data to match the table values by pulling table values
-  # to match parameter vectors
-  vars$species <- vars$table[, 1] #will need to add a check here in teh future to change this value in all equations.
-  vars$descriptions <- vars$table[, 2]
+observeEvent(input$myVariables_DT$changes$changes, {
+  xi = input$myVariables_DT$changes$changes[[1]][[1]]
+  yi = input$myVariables_DT$changes$changes[[1]][[2]]
+  old = input$myVariables_DT$changes$changes[[1]][[3]]
+  new = input$myVariables_DT$changes$changes[[1]][[4]]
+  
+  # Add check in here for variable changing name
+  
+  #copying table to dataframe
+  vars$table[xi+1, yi+1]  <- new
+  #vars$species[xi+1]      <- vars$table[xi+1, 1]
+  vars$descriptions[xi+1] <- vars$table[xi+1, 2]
 })
 
 
+# button that displays info box on parameter page
+observeEvent(input$create_var_info_button, {
+  #if odd box appears, if even box disappears
+  if (input$create_var_info_button %% 2 == 0) {
+    updateBox("create_var_info_box", action = "remove")
+  } else {
+    updateBox("create_var_info_box", action = "restore")
+  }
+})
 
-
-
+# observeEvent(input$view_ids, {
+#   jPrint(id$id.variables)
+#   jPrint(id$id.parameters)
+#   jPrint(id$id.equations)
+#   jPrint(id$id.diffeq)
+#   jPrint(id$id.seed)
+# })

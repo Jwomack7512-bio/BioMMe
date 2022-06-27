@@ -21,22 +21,34 @@ observeEvent(input$reset_input, {
   shinyjs::reset("form")
 })
 
-#updates filter_2 variable choices based on items selected in checkbox selct boxes
-observeEvent(input$execute_run_model, {
-  observe({print("Updating Input for select input xvar")})
-  updatePickerInput(session
-                    ,"lineplot_xvar"
-                    ,choices = colnames(model_output())[1])
-})
+# ****These update functions are now located in the post processing tab*********
 
 #updates filter_2 variable choices based on items selected in checkbox selct boxes
+# observeEvent(input$execute_run_model, {
+#   req(nrow(results$model.final)>1)
+#   jPrint("Updating xvar")
+#   updatePickerInput(session
+#                     ,"lineplot_xvar"
+#                     ,choices = colnames(results$model.final[1]))
+# })
+# 
+# #updates filter_2 variable choices based on items selected in checkbox selct boxes
+# observeEvent(input$execute_run_model, {
+#   req(nrow(results$model.final)>1)
+#   jPrint("Updating y var")
+#   updateSelectizeInput(session,
+#                     "lineplot_yvar"
+#                     ,choices  = colnames(results$model.final)[2:ncol(results$model.final)]
+#                     ,selected = colnames(results$model.final)[2:ncol(results$model.final)]
+#   )
+# })
 observeEvent(input$execute_run_model, {
-  observe({print("Updating input for select input yvar")})
-  updateSelectizeInput(session,
-                    "lineplot_yvar"
-                    ,choices  = colnames(ModelToUse())[2:ncol(ModelToUse())]
-                    ,selected = colnames(ModelToUse())[2:ncol(ModelToUse())]
-  )
+  updateTabsetPanel(session = session,
+                    "line_options_tabbox",
+                    selected = "Style")
+  # updateTabsetPanel(session = session,
+  #                   "line_options_tabbox",
+  #                   selected = "Color")
 })
 
 #changes xlabel for line plot to selected input
@@ -54,35 +66,37 @@ observeEvent(input$lineplot_yvar,{
                   label = "Y Label",
                   value = 'Values')
 })
-
-# gatherData <- function(){
-#   req(input$lineplot_yvar)
-#   if(input$lineplot_loop_mode){
-#     selectedData <- gather(select(data.frame(loop_model_output()), input$lineplot_xvar, input$lineplot_yvar), Variable, Value, -one_of(input$lineplot_xvar))
-#   }
-#   else{
-#     selectedData <- gather(select(data.frame(model_output()), input$lineplot_xvar, input$lineplot_yvar), Variable, Value, -one_of(input$lineplot_xvar))
-#   }
-# }
-
-# # #Renders the color panel for each different stratified categorical variable (each at varied distance color levels)
+ #Renders the color panel for each different stratified categorical variable (each at varied distance color levels)
 output$line_color_options_popdown <- renderUI({
   #if this require isn't here bad things happen but I think I need to change more
-  lev <- sort(unique(gsub(" ", "_",gatherData(ModelToUse())$Variable)))
+  lev <- sort(unique(gsub(" ", "_",gatherData(results$model.final)$Variable)))
   cols <- gg_fill_hue(length(lev))
   
   lapply(seq_along(lev), function(i){
-    colourInput(inputId = paste0("cols_line", lev[i]),
-                label = paste0("Line color: ", lev[i]),
-                value = cols[i]
-    )
+      fluidRow(
+          div(style="display: block;
+                 vertical-align:top;
+                 position: relative;
+                 z-index:100;
+                 left: 100px;
+                 top: 5px;",
+              h5(lev[i])),
+          div(style = "display: block;vertical-align:top; position: absolute; width: 65%",
+              colourpicker::colourInput(inputId = paste0("cols_line", lev[i]),
+                          label = NULL,
+                          value = cols[i],
+                          showColour = "background"
+                          )
+              )
+        )
   })
 })
+outputOptions(output, "line_color_options_popdown", suspendWhenHidden = FALSE)
 
 #This provides the dynamically allocated number of line type options for each variable in the line plots
 output$line_type_options_popdown <- renderUI({
   #if this require isn't here bad things happen but I think I need to change more
-  lev <- sort(unique(gsub(" ", "_",gatherData(ModelToUse())$Variable)))
+  lev <- sort(unique(gsub(" ", "_",gatherData(results$model.final)$Variable)))
   
   lapply(seq_along(lev), function(i){
     selectInput(inputId = paste0("line_type", lev[i]),
@@ -94,61 +108,83 @@ output$line_type_options_popdown <- renderUI({
                             "Dot-Dash" = "dotdash"))
   })
 })
-
+outputOptions(output, "line_type_options_popdown", suspendWhenHidden = FALSE)
 #this function talkes multiple inputs, and factors them into one column, creating a second column of corresponding groups
 #groups are stored in variable :Variable, call with gatherData()$Variable
 #data stores in cariable: Value, called same way
 gatherData <- function(data){
   req(input$lineplot_yvar)
-  selectedData <- gather(select(data.frame(data), 
-                                #colnames(model_output())[1],
+  selectedData <- gather(select(data.frame(data),
+                                #colnames(results$model.final)[1],
                                 "time",
-                                input$lineplot_yvar), 
-                         Variable, 
-                         Value, 
+                                input$lineplot_yvar),
+                         Variable,
+                         Value,
                          #-one_of(input$lineplot_xvar)
                          -one_of("time")
                          )
+  #selectedData <- melt(data, id.vars = "time")
 }
 
-theme_output_line <- function(){
-  if (input$theme_output_line == 'gray') {
+theme_output <- function(theme_input){
+  if (theme_input == 'gray') {
     theme_gray()}
-  else if (input$theme_output_line == 'classic') {
+  else if (theme_input == 'classic') {
     theme_classic()}
-  else if (input$theme_output_line == 'void') {
+  else if (theme_input == 'void') {
     theme_void()}
-  else if (input$theme_output_line == 'dark') {
+  else if (theme_input == 'dark') {
     theme_dark()}
-  else if (input$theme_output_line == 'bw') {
+  else if (theme_input == 'bw') {
     theme_bw()}
-  else if (input$theme_output_line == 'linedraw') {
+  else if (theme_input == 'linedraw') {
     theme_linedraw()}
-  else if (input$theme_output_line == 'light') {
+  else if (theme_input == 'light') {
     theme_light()}
-  else if (input$theme_output_line == 'minimal') {
+  else if (theme_input == 'minimal') {
     theme_minimal()}
   
+}
+
+color_palettes <- function(palette_input, n){
+  switch(palette_input,
+         viridis  = {col.out <- viridis(n)},
+         magma    = {col.out <- viridis(n, option = "magma")},
+         inferno  = {col.out <- viridis(n, option = "inferno")},
+         plasma   = {col.out <- viridis(n, option = "plasma")},
+         cividis  = {col.out <- viridis(n, option = "cividis")},
+         rocket   = {col.out <- viridis(n, option = "rocket")},
+         mako     = {col.out <- viridis(n, option = "mako")},
+         turbo    = {col.out <- viridis(n, option = "turbo")},
+         custom   = {col.out <- "CUSTOM"}
+         )
+  return(col.out)
 }
 
 #this is the function that creates the ggplot object for the line plot
 plotLineplotInput <- function(data){
   #calls data function and stores it to selectedData
   selectedData <- data
-  
-  #create vector of cols for lines
-  cols_line <- paste0("c(", paste0("input$cols_line", unique(sort(data$Variable)), collapse = ", "), ")")
-  cols_line <- eval(parse(text = cols_line))
-  
-  #create vector of linetypes for lines
+  n = length(unique(selectedData$Variable))
+  #n = length(unique(selectedData$variable))
   type_line <-  paste0("c(", paste0("input$line_type", unique(sort(data$Variable)), collapse = ", "), ")")
   type_line <- eval(parse(text = type_line))
-  # #print(type_line)
-  
+  #create vector of cols for lines
+
+  cols_line <- color_palettes(input$choose_color_palette, n)
+  # rewrite with the custom values if user chose custom
+  if (cols_line[1] == "CUSTOM") {
+    cols_line <- paste0("c(", paste0("input$cols_line", unique(sort(data$Variable)), collapse = ", "), ")")
+    cols_line <- eval(parse(text = cols_line))
+  }
+
   #ggplot function to print using geom_line
-  g_line <- ggplot(selectedData, aes(x = selectedData[,1], y = Value, color = Variable)) +
+  g_line <- ggplot(selectedData, aes(x = time, y = Value, color = Variable)) +
+    #g_line <- ggplot(selectedData, aes(x = selectedData[,1], y = Value)) +
     geom_line(aes(linetype = Variable),
               size = input$line_size_options) +
+    #scale_fill_brewer(palette = "Dark2") + 
+    #scale_color_viridis(discrete = FALSE, option = "D") + 
     scale_color_manual(name = input$line_legend_title,
                        values = cols_line) +
     scale_linetype_manual(name = input$line_legend_title,
@@ -179,15 +215,28 @@ if (is.null(input$lineplot_yvar)) {
          x = input$line_xlabel,
          y = input$line_ylabel) +
     #hjust is used to center the title, size is used to change the text size of the title
-    theme_output_line() +
+    theme_output(input$theme_output_line) +
     theme(plot.title = element_text(hjust = input$line_title_location, size = input$line_title_text_size)
           ,legend.position = input$line_legend_position
-          ,axis.title.x = element_text(hjust = input$line_xtitle_location, size = input$line_x_axis_title_size)
-          ,axis.title.y = element_text(hjust = input$line_ytitle_location, size = input$line_y_axis_title_size)
-          ,axis.text.x = element_text(size = input$line_x_axis_text_size)
-          ,axis.text.y = element_text(size = input$line_y_axis_text_size)
+          ,legend.title = element_text(size = input$line_legend_title_size)
+          ,legend.text = element_text(size = input$line_legend_font_size)
+          ,axis.title.x = element_text(hjust = input$line_xtitle_location, size = input$line_axis_title_size)
+          ,axis.title.y = element_text(hjust = input$line_ytitle_location, size = input$line_axis_title_size)
+          ,axis.text.x = element_text(size = input$line_axis_text_size)
+          ,axis.text.y = element_text(size = input$line_axis_text_size)
+
     )
 }
+  
+  if (input$line_panel_colorPicker_checkbox) {
+    g_line <- g_line + theme(panel.background = element_rect(fill = input$line_panel_colorPicker,
+                                                             colour = input$line_panel_colorPicker))
+  } else {g_line <- g_line}
+  
+  if (input$line_plotBackground_color_change) {
+    g_line <- g_line + theme(plot.background = element_rect(fill = input$line_plotBackground_colorPicker,
+                                                             colour = input$line_plotBackground_colorPicker))
+  } else {g_line <- g_line}
   
 }
 
@@ -236,15 +285,23 @@ output$model_plotType <- renderUI({
   
 })
 
-# Renderplots for all plot options ---------------------------------------------  
+# Renderplots for all plot options --------------------------------------------- 
+
 output$LinePlot <- renderPlot({
-    print(plotLineplotInput(gatherData(ModelToUse())))
+    
+    print(plotLineplotInput(gatherData(results$model.final)))
 })
 
-
+output$lineplot_plotly <- renderPlotly({
+  data <- gatherData(results$model.final)
+  #tryCatch({ggplotly(plotLineplotInput(gatherData(results$model.final)))})
+  ggplotly(plotLineplotInput(data), tooltip = c("x", "y", "colour"))
+})
+  
 output$lineplot_overlay_scatterplot <- renderPlot({
   print(PlotLineplotOverlay())
-})
+}, bg = "transparent"
+)
 
 output$downloadLine <- downloadHandler(
   filename = function(){
@@ -255,98 +312,10 @@ output$downloadLine <- downloadHandler(
   }
 )
 
-output$line_box_options <- renderUI({
-  div
-  (
-    column(width = ifelse(input$lineplot_choose_plot_mode == "compare_mode", 6, 12),
-    #____________________________________
-    #Options containing Tabs
-    #____________________________________
-    box(
-      #this is a box that holds the import data options.
-      title = NULL, 
-      status = "success", 
-      solidHeader = FALSE, 
-      collapsible = TRUE, 
-      width = NULL,
-      tabBox(
-        title = "Options",
-        width = 12,
-        #____________________________________
-        #Color Options
-        #____________________________________
-        tabPanel("Color Options",
-                 fluidRow(
-                   #add line color options
-                   column(width = 12,
-                          fluidRow(
-                            column(width = 3,
-                                   uiOutput("line_color_options_popdown")),
-                            column(width = 3,
-                                   uiOutput("line_type_options_popdown")))
-                   ) #end column
-                 ) #end fluidRow
-        ), #end tabPanel
-        #____________________________________
-        #Background Options
-        #____________________________________                        
-        tabPanel("Background Options",
-                 
-                 fluidRow(
-                   column(width = 5,
-                          selectInput(
-                            inputId = "theme_output_line",
-                            label = "Background Theme", 
-                            choices = c("gray"
-                                        ,"bw"
-                                        ,"linedraw"
-                                        ,"light"
-                                        ,"minimal"
-                                        ,"classic"
-                                        ,"void"
-                                        ,"dark")
-                          ),
-                          fluidRow(
-                            div(style="display:inline-block; text_align:right;", 
-                                prettyCheckbox(inputId="line_panel_colorPicker_checkbox", 
-                                               label=NULL, 
-                                               value = FALSE)),
-                            div(style="display:inline-block; text_align:right;", 
-                                colourInput(inputId="line_panel_colorPicker", 
-                                            label="Select Color", 
-                                            value="grey"))))
-                 )
-                 
-                 
-        ),#end tabPanel
-        #____________________________________
-        #Legend Options
-        #____________________________________
-        tabPanel("Legend Options",
-                 fluidRow(
-                   column(width=5,
-                          selectInput(inputId="line_legend_position",
-                                      label = "Location of Legend",
-                                      choices = c("Left" = "left", 
-                                                  "Right" = "right", 
-                                                  "Top" = "top", 
-                                                  "Bottom" = "bottom", 
-                                                  "No Legend" = "none"),
-                                      selected = "right"),
-                          textInput(inputId="line_legend_title",
-                                    label = "Legend Title",
-                                    value = "")))
-        ) #end tabPanel
-      )#End tabBox
-    ) #End box
-    ) #end column
-
-  )
-})
 
 #-------------------------------------------------------------------------------
 
-# This section covers the plotting of the comparison plot
+# This section covers the plotting of DataOverlay
 
 #-------------------------------------------------------------------------------
 
@@ -393,51 +362,6 @@ PlotLineplotOverlay <- function(){  #---still have to add scatter plot somehow
   
 }
 
-plotLineplotInput_compare <- function(){
-  #calls data function and stores it to selectedData
-  if (input$compare_execute_run_model != 0)
-  {
-    selectedData <- gather(select(data.frame(compare_model_output()), input$lineplot_xvar, input$lineplot_yvar), Variable, Value, -one_of(input$lineplot_xvar))
-  }
-  else
-  {
-    selectedData <- gatherData()
-  }
- 
-  
-  #create vector of cols for lines
-  cols_line <- paste0("c(", paste0("input$cols_line", unique(sort(gatherData()$Variable)), collapse = ", "), ")")
-  cols_line <- eval(parse(text = cols_line))
-  
-  #create vector of linetypes for lines
-  type_line <-  paste0("c(", paste0("input$line_type", unique(sort(gatherData()$Variable)), collapse = ", "), ")")
-  type_line <- eval(parse(text = type_line))
-  # #print(type_line)
-  
-  #ggplot function to print using geom_line
-  g_line <- ggplot(selectedData, aes(x = selectedData[,1], y = Value, color = Variable)) +
-    geom_line(aes(linetype = Variable),
-              size = input$line_size_options) +
-    scale_color_manual(name = input$line_legend_title,
-                       values = cols_line) +
-    scale_linetype_manual(name = input$line_legend_title,
-                          values = type_line)
-  
-  if (input$line_show_dots) {g_line <- g_line + geom_point()}
-  else{g_line <- g_line}
-  
-  g_line <- g_line +
-    #this adds title, xlabel, and ylabel to graph based upon text inputs
-    labs(title = input$line_title_comparisonPlot,
-         x = input$line_xlabel,
-         y = input$line_ylabel) +
-    #hjust is used to center the title, size is used to change the text size of the title
-    theme_output_line() +
-    theme(plot.title = element_text(hjust = 0.5, size = 22),
-          #allows user to change position of legend
-          legend.position = input$line_legend_position)
-  
-}
 
 # Scatterplot Overlay ----------------------------------------------------------
 overlay_scatter_data <- reactive({
@@ -465,5 +389,8 @@ observeEvent(input$overlay_scatter_input, {
                     ,selected = colnames(overlay_scatter_data())[2])
 })
 
-
-
+# 
+# output$dyGraph <- renderDygraph({
+#   selectedData <- gatherData(results$model.final)
+#   dygraph(selectedData, main = "test")
+# })

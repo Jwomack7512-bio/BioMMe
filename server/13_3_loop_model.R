@@ -4,221 +4,117 @@
 
 ##############################################################################
 
-#---------------------------- P A R A M E T E R S ------------------------------
+w.loop <- Waiter$new(id = c("LinePlot_loop", "lineplot_loop_plotly"),
+                     html = tagList(
+                       spin_loaders(32),
+                       h4("Soving Model...")
+                     ))
+w.loop.store <- Waiter$new(id = c("LinePlot_loop", "lineplot_loop_plotly"),
+                           html = tagList(
+                             spin_loaders(32),
+                             h4("Overwriting Parameters"))
+)
+# Reactive variables to store loop model variables
+loop <- reactiveValues(
+  parameters = data.frame(matrix(ncol=3,
+                                 nrow=0,
+                                 dimnames = list(NULL, c("Parameter",
+                                                         "Value",
+                                                         "Description")))),
+  ICs = data.frame(matrix(ncol = 3,
+                          nrow = 0,
+                          dimnames = list(NULL, c("Variable"
+                                                  ,"Value"
+                                                  ,"Description")))),
+  time.start = 0,
+  time.end = 100, 
+  time.step = 1,
+  model.results = data.frame()
+)
 
+# When parameters change, above reactive variables take the value of parms$param.table and ICs$ICs.table
 
-#------------------------------------------------
-#Parameters Rendered from Equations
-#------------------------------------------------
-output$loop_parameters_eqns_header <- renderUI({
-  req(input$eqnCreate_addEqnToVector)
-  h4("Parameters From Equations")
+#load parameter table
+output$loop_mode_parameters <- renderRHandsontable({
+  rhandsontable(loop$parameters, stretchH = "all") %>%
+    hot_col("Parameter", readOnly = TRUE)
 })
 
-output$loop_parameters_eqns <- renderUI({
-  req(input$eqnCreate_addEqnToVector)
-  number_parameters = length(params$eqns.vars)
-  
-  fluidRow(column(width = 2
-                  ,lapply(seq(number_parameters), function(i){
-                    textInput(inputId = paste0("loop_parameter_", as.character(i))
-                              ,label = params$eqns.vars[i]
-                              ,value = ifelse(params$first.param.eqn.stored, params$eqns.vals[i], "0"))
-                  }))
-           ,column(width = 8
-                   ,lapply(seq(number_parameters), function(i){
-                     textInput(inputId = paste0("loop_parameter_description_", as.character(i))
-                               ,label = "Parameter Description"
-                               ,value = ifelse(params$first.param.eqn.stored, params$eqns.comments[i], ""))
-                   }))
-  ) #end fluidRow
+# Account for changes in parameter table
+observeEvent(input$loop_mode_parameters$changes$changes, {
+  loop$parameters <- hot_to_r(input$loop_mode_parameters)
 })
 
-#------------------------------------------------
-#Parameters Rendered from Input values
-#------------------------------------------------
-output$loop_parameters_inputs_header <- renderUI({
-  req(input$Inout_addInVarToDf)
-  h4("Parameters From Inputs")
+#load initial conditions table
+output$loop_mode_ICs <- renderRHandsontable({
+  rhandsontable(loop$ICs, stretchH = "all") %>%
+    hot_col("Variable", readOnly = TRUE)
 })
 
-output$loop_parameters_inputs <- renderUI({
-  req(input$Inout_addInVarToDf)
-  number_parameters = length(params$inputs.vars) #find number of parameters in inputs
-  
-  #generate labels with paramters name to put value into
-  #generate text input next to it to put comment for variable into
-  #ifelse in value is used to put the current value into the text input if it exists otherwise a 0 or ""
-  fluidRow(column(width=2
-                  ,lapply(seq(number_parameters), function(i){
-                    textInput(inputId=paste0("loop_parameter_input_", as.character(i))
-                              ,label=params$inputs.vars[i]
-                              ,value = ifelse(params$first.inputs.stored, params$inputs.vals[i], "0"))
-                  }))
-           ,column(width=8
-                   ,lapply(seq(number_parameters), function(i){
-                     textInput(inputId=paste0("loop_parameter_description_input_", as.character(i))
-                               ,label="Parameter Description"
-                               ,value =ifelse(params$first.inputs.stored, params$inputs.comments[i], ""))
-                   }))
-  ) #end fluidRow
+# account for changes in IC table
+observeEvent(input$loop_mode_ICs$changes$changes, {
+  loop$ICs <- hot_to_r(input$loop_mode_ICs)
 })
 
-#------------------------------------------------
-#Parameters Rendered from Output values
-#------------------------------------------------
-output$loop_parameters_outputs_header <- renderUI({
-  req(input$Inout_addOutVarToDf)
-  h4("Parameters From Output")
+#load plots
+output$LinePlot_loop <- renderPlot({
+  print(plotLineplotInput(gatherData(loop$model.results)))
 })
 
-output$loop_parameters_outputs <- renderUI({
-  req(input$Inout_addOutVarToDf)
-  number_parameters = length(params$outputs.vars) #find number of parameters in inputs
-  
-  #generate labels with paramters name to put value into
-  #generate text input next to it to put comment for variable into
-  #ifelse in value is used to put the current value into the text input if it exists otherwise a 0 or ""
-  fluidRow(column(width=2
-                  ,lapply(seq(number_parameters), function(i){
-                    textInput(inputId=paste0("loop_parameter_output_", as.character(i))
-                              ,label=params$outputs.vars[i]
-                              ,value = ifelse(params$first.outputs.stored, params$outputs.vals[i], "0"))
-                  }))
-           ,column(width=8
-                   ,lapply(seq(number_parameters), function(i){
-                     textInput(inputId=paste0("loop_parameter_description_output_", as.character(i))
-                               ,label="Parameter Description"
-                               ,value =ifelse(params$first.outputs.stored, params$outputs.comments[i], ""))
-                   }))
-  ) #end fluidRow
+
+output$lineplot_loop_plotly <- renderPlotly(
+  ggplotly(plotLineplotInput(gatherData(loop$model.results)), 
+           tooltip = c("x", "y", "colour"))
+)
+
+
+# Update Time panels when they change
+observeEvent(input$execute_time_start, {
+  updateTextInput(session, "loop_start_time", value = input$execute_time_start)
+  loop$time.start <- input$execute_time_start 
+})
+observeEvent(input$execute_time_end, {
+  updateTextInput(session, "loop_end_time", value = input$execute_time_end)
+  loop$time.end <- input$execute_time_end
+})
+observeEvent(input$execute_time_step, {
+  updateTextInput(session, "loop_time_step", value = input$execute_time_step)
+  loop$time.step <- input$execute_time_step
+})
+observeEvent(input$loop_start_time, {
+  loop$time.start <- input$loop_start_time
+})
+observeEvent(input$loop_end_time, {
+  loop$time.end <- input$loop_end_time
+})
+observeEvent(input$loop_time_step, {
+  loop$time.step <- input$loop_time_step
 })
 
-################################################################################
 
-#Load initial Conditions in
+#hook up execute model button
+observeEvent(input$loop_mode_execute, {
+  w.loop$show()
+  #extract ICs for loop model
+  IC.vars <- loop$ICs[,1]
+  IC.vals <- loop$ICs[,2]
 
-################################################################################
-output$loop_ICs_UI <- renderUI({
-  req(input$createVar_addVarToList)
-  number_var = length(vars$species)
-  
-  
-  fluidRow(column(width=2
-                  ,lapply(seq(number_var), function(i){
-                    textInput(inputId=paste0("loop_IC_", as.character(i))
-                              ,label=paste(vars$species[i], "initial value:")
-                              ,value = ifelse(ICs$first.IC.stored, ICs$vals[i], "0"))
-                  }))
-           # ,column(width=1
-           #         ,lapply(seq(number_parameters), function(i){
-           #           checkboxInput(inputId=paste0("parameter_check_unknown_", as.character(i))
-           #                     ,label="Value Unknown"
-           #                     ,value = FALSE)
-           #         }))
-           # ,column(width=8
-           #         ,lapply(seq(number_var), function(i){
-           #           textInput(inputId=paste0("loop_ICs_description_", as.character(i))
-           #                     ,label="Comment"
-           #                     ,value = ifelse(ICs$first.IC.stored, ICs$comments[i], ""))
-           #         })
-           # )
-  ) #end fluidRown
-  
-})
+  # Extract parameters for loop model
+  param.vars <- loop$parameters[,1]
+  param.vals <- loop$parameters[,2]
 
-loop_model_output <- eventReactive(input$loop_execute_run_model, {
-  num_ICs<- length(vars$species)
-  
-  IC_values <- vector()
-  IC_comments <- vector()
-  for(i in seq(num_ICs)){
-    single_value <- eval(parse(text=paste0("input$loop_IC_", as.character(i))))
-    IC_values <- append(IC_values, single_value)
-    
-    single_comment <- eval(parse(text=paste0("input$loop_ICs_description_", as.character(i)))) #evaluate value in textinput
-    IC_comments <- append(IC_comments, single_comment) #append comments to vector
-  }
-  IC_values <- paste(IC_values, sep=" ")
-  
-  ICs$vals <- as.numeric(IC_values)
-  ICs$comments <- IC_comments
-  
-  #-------------------------------store params
-  #store equation parameters
-  if(length(params$eqns.vars != 0)){
-    params$first.param.eqn.stored <- TRUE #set boolean so parameter values refil when UI is rendered
-    num_params <- length(params$eqns.vars)
-    param_values <- vector() #create vector to store parameter values
-    param_comments <- vector() #create vector to store parameter commemts
-    
-    for(i in seq(num_params)){
-      single_value <- eval(parse(text=paste0("input$loop_parameter_", as.character(i)))) #evaluate value in textinput
-      param_values <- append(param_values, single_value) #add value from textinput to vector
-      
-      single_comment <- eval(parse(text=paste0("input$loop_parameter_description_", as.character(i)))) #evaluate value in textinput
-      param_comments <- append(param_comments, single_comment) #append comments to vector
-      param_values <- paste(param_values, sep = " ") #drop vector to a single string separated by spaces
-      params$eqns.vals <- as.numeric(param_values) #store parameter values to reactive value
-      params$eqns.comments <- param_comments # store paramter comments to reactive value
-    }
-  }
-  
-  #store input parameters
-  if(length(params$inputs.vars != 0)){
-    params$first.inputs.stored <- TRUE #set boolean so parameter values refil when UI is rendered
-    num_params <- length(params$inputs.vars)
-    param_values <- vector() #create vector to store parameter values
-    param_comments <- vector() #create vector to store parameter commemts
-    
-    for(i in seq(num_params)){
-      single_value <- eval(parse(text=paste0("input$loop_parameter_input_", as.character(i)))) #evaluate value in textinput
-      param_values <- append(param_values, single_value) #add value from textinput to vector
-      
-      single_comment <- eval(parse(text=paste0("input$loop_parameter_description_input_", as.character(i)))) #evaluate value in textinput
-      param_comments <- append(param_comments, single_comment) #append comments to vector
-      param_values <- paste(param_values, sep = " ") #drop vector to a single string separated by spaces
-      params$inputs.vals <- as.numeric(param_values) #store parameter values to reactive value
-      params$inputs.comments <- param_comments # store paramter comments to reactive value
-    }
-  }
-  
-  #store output parameters
-  if(length(params$outputs.vars != 0)){
-    params$first.outputs.stored <- TRUE #set boolean so parameter values refil when UI is rendered
-    num_params <- length(params$outputs.vars)
-    param_values <- vector() #create vector to store parameter values
-    param_comments <- vector() #create vector to store parameter commemts
-    
-    for(i in seq(num_params)){
-      single_value <- eval(parse(text=paste0("input$loop_parameter_output_", as.character(i)))) #evaluate value in textinput
-      param_values <- append(param_values, single_value) #add value from textinput to vector
-      
-      single_comment <- eval(parse(text=paste0("input$loop_parameter_description_output_", as.character(i)))) #evaluate value in textinput
-      param_comments <- append(param_comments, single_comment) #append comments to vector
-      param_values <- paste(param_values, sep = " ") #drop vector to a single string separated by spaces
-      params$outputs.vals <- as.numeric(param_values) #store parameter values to reactive value
-      params$outputs.comments <- param_comments # store paramter comments to reactive value
-    }
-  }
-  
-  #Store all Paramters to overall vector
-  params$vars.all = c(params$eqns.vars, params$inputs.vars, params$outputs.vars)
-  params$vals.all = c(params$eqns.vals, params$inputs.vals, params$outputs.vals)
-  params$comments.all = c(params$eqns.comments, params$inputs.comments, params$outputs.comments)
-  
   #run the model 
   #set up time for solver
-  time_in <- as.numeric(input$loop_execute_time_start)
-  time_out <- as.numeric(input$loop_execute_time_end)
-  time_step <- as.numeric(input$loop_execute_time_step)
-  times <- seq(time_in, time_out, by=time_step)
+  time.in <- as.numeric(loop$time.start)
+  time.out <- as.numeric(loop$time.end)
+  time.step <- as.numeric(loop$time.step)
+  times <- seq(time.in, time.out, by=time.step)
   
   #initialize parameters
-  parameters <- output_param_for_ode_solver(params$vars.all, params$vals.all)
+  parameters <- output_param_for_ode_solver(param.vars, param.vals)
   
   #initialize initial conditions
-  state <- output_ICs_for_ode_solver(vars$species ,ICs$vals)
+  state <- output_ICs_for_ode_solver(IC.vars ,IC.vals)
   
   #set up differential equations input string form
   diff_eqns <- diffeq_to_text(DE$eqns, vars$species)
@@ -231,24 +127,44 @@ loop_model_output <- eventReactive(input$loop_execute_run_model, {
     })
   }
   
-  #out <- ode(y=state, times=times, func=model, parms=parameters)
-  out <- ode(y=state, times=times, func = Lorenz, parms = parameters)
+  out <- ode(y=state, 
+             times=times, 
+             func = Lorenz, 
+             parms = parameters)
   
-  return(out)
+  loop$model.results <- out
+  w.loop$hide()
 })
 
-#updates filter_2 variable choices based on items selected in checkbox selct boxes
-observeEvent(input$loop_execute_run_model, {
-  updateSelectInput(session
-                    ,"lineplot_xvar"
-                    ,choices = colnames(loop_model_output())[1])
+#hook up store variables button
+observeEvent(input$loop_mode_store_variables, {
+  w.loop.store$show()
+  Sys.sleep(0.5)
+  # waiter_show(id = "loop_mode_store_variables",
+  #             html = div(spin_1(), "Storing Variables"))
+  #store time
+  updateTextInput(session, "execute_time_start", value = input$loop_start_time)
+  updateTextInput(session, "execute_time_end",   value = input$loop_end_time)
+  updateTextInput(session, "execute_time_step",  value = input$loop_time_step)
+  options$time.start <- loop$time.start
+  options$time.end   <- loop$time.end
+  options$time.step  <- loop$time.step
+    
+  #store initial conditions
+  ICs$ICs.table <- loop$ICs
+  ICs$vals <- loop$ICs[,2]
+  ICs$comments <- loop$ICs[,3]
+  
+  #store parameter
+  params$vars.all <- loop$parameters[,1]
+  params$vals.all <- loop$parameters[,2]
+  params$comments.all <- loop$parameters[,3]
+  params$param.table <- loop$parameters
+  #reset parameter table view 
+  updatePickerInput(session, "parameters_filter_type", selected = "Eqns")
+  updatePickerInput(session, "parameters_filter_type", selected = "All")
+  w.loop.store$hide()
+  # waiter_hide(id = "loop_mode_store_variables")
 })
 
-#updates filter_2 variable choices based on items selected in checkbox selct boxes
-observeEvent(input$loop_execute_run_model, {
-  updatePickerInput(session,
-                    "lineplot_yvar"
-                    ,choices  = colnames(loop_model_output())[2:ncol(loop_model_output())]
-                    ,selected = colnames(loop_model_output())[2:ncol(loop_model_output())]
-  )
-})
+

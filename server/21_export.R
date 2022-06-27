@@ -15,6 +15,7 @@ output$export_save_data <- downloadHandler(
     info.temp <- reactiveValuesToList(info)
     #dfs.temp  <- reactiveValuesToList(data)
     logs.temp <- reactiveValuesToList(logs)
+    id.temp   <- reactiveValuesToList(id)
 
     # to.save <- mapply(c,
     #                   vars
@@ -38,7 +39,8 @@ output$export_save_data <- downloadHandler(
                  ,opts.temp
                  ,rslt.temp
                  ,info.temp
-                 ,logs.temp)
+                 ,logs.temp
+                 ,id.temp)
 
     saveRDS(to.save, file)
   }
@@ -88,15 +90,34 @@ output$export_data_to_R_script <- downloadHandler(
 output$export_latex_document <- downloadHandler(
   filename = function(){"latex_test_script.txt"},
   content = function(file){
+    add.eqn.headers <- FALSE
+    add.eqn.descriptions <- FALSE
+    #pull values from checkboxgroups
+    if ("show_eqn_type" %in% input$latex_additional_options) {add.eqn.headers <- TRUE}
+    if ("show_eqn_description" %in% input$latex_additional_options) {add.eqn.descriptions <- TRUE}
     
-    observe({print(vars$species)})
-    observe({print(vars$descriptions)})
+    #bools for pages to add for latex doc
+    page.add.var <- FALSE
+    page.add.eqns <- FALSE
+    page.add.add.eqns <- FALSE
+    page.add.IO <- FALSE
+    page.add.param <- FALSE
+    page.add.diffeqs <- FALSE
+    
+    if ("Variable" %in% input$latex_pages_to_add) {page.add.var <- TRUE}
+    if ("Equations" %in% input$latex_pages_to_add) {page.add.eqns <- TRUE}
+    if ("Additional Equations" %in% input$latex_pages_to_add) {page.add.add.eqns <- TRUE}
+    if ("Input/Output" %in% input$latex_pages_to_add) {page.add.IO <- TRUE}
+    if ("Parameter Table" %in% input$latex_pages_to_add) {page.add.param <- TRUE}
+    if ("Differential Eqns" %in% input$latex_pages_to_add) {page.add.diffeqs <- TRUE}
+    
+
     latex.species <- SpeciesInModel(vars$species, vars$descriptions)
-    latex.eqns <- EqnsToLatex(eqns$eqn.info, 
-                              input$latex_equation_headers, 
-                              input$latex_equation_description,
+    latex.eqns <- EqnsToLatex(eqns$eqn.main.latex,
+                              add.eqn.headers,
+                              add.eqn.descriptions,
                               eqns$eqn.descriptions)
-    latex.IO <- InputOutputToLatex(IO$IO.info)
+    # latex.IO <- InputOutputToLatex(IO$IO.info)
     latex.addEqns <- AdditionalEqnsToLatex(eqns$additional.eqns)
     latex.paramTable <- GenerateParameterTable(params$vars.all,
                                                 params$vals.all,
@@ -105,13 +126,13 @@ output$export_latex_document <- downloadHandler(
     
     
     out <- ""
-    if (input$latex_add_variables) {out <- paste0(out, latex.species)}
-    if (input$latex_add_equations) {out <- paste0(out, latex.eqns)}
-    if (input$latex_add_additionalEqns) {out <- paste0(out, latex.addEqns)}
-    if (input$latex_add_IO) {out <- paste0(out, latex.IO)}
-    if (input$latex_add_paramTable) {out <- paste0(out, latex.paramTable)}
-    if (input$latex_add_diffEqns) {out <- paste0(out, latex.diffEqs)}
-    
+    if (page.add.var) {out <- paste0(out, latex.species)}
+    if (page.add.eqns) {out <- paste0(out, latex.eqns)}
+    if (page.add.add.eqns) {out <- paste0(out, latex.addEqns)}
+    # if (page.add.IO) {out <- paste0(out, latex.IO)}
+    if (page.add.param) {out <- paste0(out, latex.paramTable)}
+    if (page.add.diffeqs) {out <- paste0(out, latex.diffEqs)}
+
     latex.file <- GenerateLatexDocument(out)
     #latex.file <- GenerateLatexDocument(latex.eqns)
     writeLines(latex.file, file)
